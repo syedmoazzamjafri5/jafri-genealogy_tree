@@ -89,18 +89,37 @@
     .spouses { font-size: 12px; margin-top: 6px; color: var(--muted); }
     .spouses strong { color: var(--accent); font-weight:600; }
 
-    #references {
-    position: fixed;
-    top: 10px;
-    right: 10px;
-    width: 220px;
-    background: #0b1020; /* light grey */
-    border: 1px solid #ccc;
-    border-radius: 8px;
-    padding: 12px;
-    font-size: 14px;
-    box-shadow: 0 2px 6px rgba(0,0,0,0.1);
-    z-index: 1000; /* always above */}
+    #referencesSection {
+  margin-top: 20px;
+  text-align: center;
+}
+
+#referencesContent {
+  margin-top: 10px;
+  padding: 15px;
+  border: 1px solid #ddd;
+  border-radius: 10px;
+  max-width: 600px;
+  margin-left: auto;
+  margin-right: auto;
+  background: #0b1020;
+  font-size: 0.95em;
+}
+
+.hidden {
+  display: none;
+}
+
+#refToggle {
+  background: none;
+  border: none;
+  color: #0077cc;
+  font-size: 1em;
+  cursor: pointer;
+}
+#refToggle:hover {
+  text-decoration: underline;
+}
 
     /* Collapse behavior */
     li.collapsed > ul { display: none; }
@@ -140,16 +159,19 @@
     </div>
   </div>
 
-  <div id="references">
-  <h3>References</h3>
-  <ul>
+  <div id="referencesSection">
+  <button id="refToggle" onclick="toggleGlobalReferences()">📚 Show References</button>
+  <div id="referencesContent" class="hidden">
+    <h3>References</h3>
+    <ul>
     <li>The Life of Muhammad By Guillaume, A.</li>
     <li>Sirat ul Nabi By Hussain, Jafar M.</li>
     <li>Al-Irshad By Sheikh Mufeed</li>
     <li>The Message By Ayatullah Jafar Subhānī</li>
-  </ul>
+    </ul>
   </div>
-  <script>
+</div>
+<script>
 
   const PEOPLE = [
     { id: 'p1', name: 'Adam (a.s)', gender: 'M', fatherId: null, motherId: null, spouses: ['p2'] },
@@ -519,6 +541,34 @@
       if (tog) tog.textContent = '–';
     });
   }
+
+
+  let globalRefPopupShown = false;
+
+function toggleGlobalReferences() {
+  const btn = document.getElementById("refToggle");
+  const content = document.getElementById("referencesContent");
+
+  // Mobile popup first time only
+  if (!globalRefPopupShown && /Mobi|Android/i.test(navigator.userAgent)) {
+    alert("📱 For best experience, please view references on a computer.");
+    globalRefPopupShown = true;
+  }
+
+  content.classList.toggle("hidden");
+
+  // Change button text
+  if (content.classList.contains("hidden")) {
+    btn.textContent = "Show References";
+  } else {
+    btn.textContent = "Hide References";
+  }
+}
+
+
+
+
+
 
   function exportJSON() {
     const data = JSON.stringify(PEOPLE, null, 2);
