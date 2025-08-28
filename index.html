@@ -545,15 +545,19 @@
 
   let globalRefPopupShown = false;
 
+  window.addEventListener("load", () => {
+  // Check if device is mobile
+  if (/Mobi|Android/i.test(navigator.userAgent)) {
+    if (!globalRefPopupShown) {
+      alert("📱 For best experience, please view references on a computer.");
+      globalRefPopupShown = true;
+    }
+  }
+});
+
 function toggleGlobalReferences() {
   const btn = document.getElementById("refToggle");
   const content = document.getElementById("referencesContent");
-
-  // Mobile popup first time only
-  if (!globalRefPopupShown && /Mobi|Android/i.test(navigator.userAgent)) {
-    alert("📱 For best experience, please view references on a computer.");
-    globalRefPopupShown = true;
-  }
 
   content.classList.toggle("hidden");
 
