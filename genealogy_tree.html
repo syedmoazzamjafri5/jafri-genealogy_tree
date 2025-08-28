@@ -1,0 +1,597 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Syed Jafri's Genealogy Tree</title>
+  <style>
+    :root {
+      --bg: #0b1020;
+      --card: #111935;
+      --text: #e9eefc;
+      --muted: #9fb3ff;
+      --line: #3a4a86;
+      --accent: #7aa2ff;
+      --accent-2: #8be9fd;
+      --danger: #ff6b6b;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, "Noto Sans", Ubuntu, Cantarell, Helvetica, Arial;
+      background: radial-gradient(1000px 500px at 20% -10%, #1a2453, #0b1020 60%);
+      color: var(--text);
+    }
+    header {
+      position: sticky; top: 0; z-index: 10;
+      backdrop-filter: blur(8px);
+      background: linear-gradient(180deg, rgba(11,16,32,.85), rgba(11,16,32,.6));
+      border-bottom: 1px solid rgba(138,155,255,.15);
+    }
+    .wrap { max-width: 1100px; margin: 0 auto; padding: 16px; }
+    .title { display:flex; align-items:center; gap:12px; flex-wrap:wrap; }
+    .title h1{ font-size: clamp(18px, 3vw, 28px); margin:0; font-weight:700; letter-spacing:.3px; }
+    .controls { display:flex; gap:8px; flex-wrap:wrap; margin-top:10px; }
+    .controls input[type="text"], .controls select, .controls button, .controls label {
+      font: inherit; border: 1px solid rgba(138,155,255,.25); background: #0f1733; color: var(--text); padding: 10px 12px; border-radius: 12px;
+    }
+    .controls input[type="file"] { display:none; }
+    .controls button { cursor: pointer; transition:.2s transform, .2s background; }
+    .controls button:hover { transform: translateY(-1px); background:#121e41; }
+    .hint { color: var(--muted); font-size: 13px; margin-top:6px; }
+
+    /* Tree container */
+    #viewport { overflow-x: auto; overflow-y: hidden; padding: 22px 12px 40px; }
+    .tree { white-space: nowrap; text-align: center; }
+    .tree ul { padding-top: 24px; position: relative; }
+    .tree li {
+      display: inline-block; text-align: center; list-style-type: none; position: relative; padding: 22px 8px 0 8px;
+      vertical-align: top; white-space: normal;
+    }
+    /* horizontal connectors */
+    .tree li::before, .tree li::after {
+      content: ''; position: absolute; top: 0; right: 50%; border-top: 2px solid var(--line); width: 50%; height: 22px;
+    }
+    .tree li::after { right: auto; left: 50%; border-left: 2px solid var(--line); }
+    .tree li:only-child::after, .tree li:only-child::before { display: none; }
+    .tree li:only-child { padding-top: 0; }
+    .tree li:first-child::before { border: 0 none; }
+    .tree li:last-child::after { border: 0 none; }
+    /* vertical connector down to children */
+    .tree ul ul::before { content: ''; position: absolute; top: -2px; left: 50%; border-left: 2px solid var(--line); width: 0; height: 24px; }
+
+    .tree ul {
+    display: flex;
+    justify-content: center;
+    align-items: flex-start; /* ✅ keeps top edges aligned */
+    }
+
+    .tree li {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    }
+
+    /* Person card */
+    .card {
+      min-width: 180px; max-width: 220px;
+      display: inline-block; padding: 10px 12px; border-radius: 16px; background: linear-gradient(180deg, var(--card), rgba(17,25,53,.85));
+      box-shadow: 0 8px 22px rgba(10,14,30,.45), inset 0 0 0 1px rgba(130,150,255,.14);
+      border: 1px solid rgba(130,150,255,.12);
+      text-align: left; position: relative; cursor: pointer; user-select: none;
+      transition: .2s transform, .2s box-shadow, .2s background;
+    }
+    .card:hover { transform: translateY(-2px); box-shadow: 0 14px 30px rgba(10,14,30,.55), inset 0 0 0 1px rgba(130,150,255,.25); }
+    .name { font-weight: 700; letter-spacing:.2px; }
+    .tags { display:flex; gap:6px; flex-wrap:wrap; margin-top: 6px; }
+    .tag { font-size:12px; padding:2px 8px; border-radius:999px; background:#0d1b3d; border:1px solid rgba(130,150,255,.18); color: var(--muted); }
+    .meta { font-size: 12px; color: var(--muted); margin-top: 6px; }
+    .spouses { font-size: 12px; margin-top: 6px; color: var(--muted); }
+    .spouses strong { color: var(--accent); font-weight:600; }
+
+    #references {
+    position: fixed;
+    top: 10px;
+    right: 10px;
+    width: 220px;
+    background: #0b1020; /* light grey */
+    border: 1px solid #ccc;
+    border-radius: 8px;
+    padding: 12px;
+    font-size: 14px;
+    box-shadow: 0 2px 6px rgba(0,0,0,0.1);
+    z-index: 1000; /* always above */}
+
+    /* Collapse behavior */
+    li.collapsed > ul { display: none; }
+    li .toggle { position:absolute; top:-10px; left:50%; transform: translateX(-50%); background:#0f1733; border:1px solid rgba(130,150,255,.25); color: var(--text);
+      width:22px; height:22px; border-radius: 999px; display:flex; align-items:center; justify-content:center; font-size:12px; cursor:pointer; }
+
+    /* Utility */
+    .row { display:flex; gap:8px; align-items:center; flex-wrap: wrap; }
+    .spacer { flex:1; }
+    .notice { background: #111a39; border: 1px dashed rgba(130,150,255,.35); padding: 12px; border-radius: 12px; color: var(--muted); }
+    .kbd { border: 1px solid rgba(130,150,255,.35); background: #0f1733; border-bottom-width: 3px; padding: 2px 6px; border-radius: 6px; font-size: 12px; }
+    .pill { padding: 4px 8px; border-radius: 999px; background: #0e1733; border: 1px solid rgba(130,150,255,.25); font-size: 12px; color: var(--muted); }
+  </style>
+</head>
+<body>
+  <header>
+    <div class="wrap">
+      <div class="title">
+        <h1>Syed Jafri's Genealogy Tree</h1>
+        <span class="pill">Digitized By Syed Muhammad Moazzam Mehdi Jafri</span>
+      </div>
+      <div class="controls">
+        <input id="search" type="text" placeholder="Search name… (e.g., Raza)" />
+        <button id="btnSearch" title="Search and focus">Search</button>
+        <label for="rootPicker">Root person:</label>
+        <select id="rootPicker"></select>
+        <button id="expandAll">Expand all</button>
+        <button id="collapseAll">Collapse all</button>
+      </div>
+      
+    </div>
+  </header>
+
+  <div id="viewport">
+    <div class="wrap">
+      <div id="treeContainer" class="tree"></div>
+    </div>
+  </div>
+
+  <div id="references">
+  <h3>References</h3>
+  <ul>
+    <li>The Life of Muhammad By Guillaume, A.</li>
+    <li>Sirat ul Nabi By Hussain, Jafar M.</li>
+    <li>Al-Irshad By Sheikh Mufeed</li>
+    <li>The Message By Ayatullah Jafar Subhānī</li>
+  </ul>
+  </div>
+  <script>
+
+  const PEOPLE = [
+    { id: 'p1', name: 'Adam (a.s)', gender: 'M', fatherId: null, motherId: null, spouses: ['p2'] },
+    { id: 'p2', name: 'Hawa (s.a)', gender: 'F', fatherId: null, motherId: null, spouses: ['p1'] },
+
+      { id: 'p3', name: 'Habeel', gender: 'M', fatherId: 'p1', motherId: 'p2'},
+      { id: 'p4', name: 'Hazrat Shees (a.s)', gender: 'M', fatherId: 'p1', motherId: 'p2'},
+      { id: 'p5', name: 'Qabeel', gender: 'M', fatherId: 'p1', motherId: 'p2'},
+
+      { id: 'p6', name: 'Anoosh (a.s)', gender: 'M', fatherId: 'p4', motherId: null},
+      { id: 'p7', name: 'Qenan (a.s)', gender: 'M', fatherId: 'p6', motherId: null},
+      { id: 'p8', name: 'Mehlamel (a.s)', gender: 'M', fatherId: 'p7', motherId: null},
+      { id: 'p9', name: 'Ilyarud (a.s)', gender: 'M', fatherId: 'p8', motherId: null},
+      { id: 'p10', name: 'Hazrat Idrees (a.s)', gender: 'M', fatherId: 'p9', motherId: null},
+      { id: 'p11', name: 'Mattushalkh (a.s)', gender: 'M', fatherId: 'p10', motherId: null},
+      { id: 'p12', name: 'Lamak (a.s)', gender: 'M', fatherId: 'p11', motherId: null},
+      { id: 'p13', name: 'Hazrat Nooh (a.s)', gender: 'M', fatherId: 'p12', motherId: null},
+
+        { id: 'p14', name: 'Haam', gender: 'M', fatherId: 'p13', motherId: null},
+        { id: 'p15', name: 'Saam (a.s)', gender: 'M', fatherId: 'p13', motherId: null},
+        { id: 'p16', name: 'Yafis', gender: 'M', fatherId: 'p13', motherId: null},
+
+      { id: 'p17', name: 'Arkshad (a.s)', gender: 'M', fatherId: 'p15', motherId: null},
+      { id: 'p18', name: 'Salib (a.s)', gender: 'M', fatherId: 'p17', motherId: null},
+      { id: 'p19', name: 'Abir (a.s)', gender: 'M', fatherId: 'p18', motherId: null},
+      { id: 'p20', name: 'Fahij (a.s)', gender: 'M', fatherId: 'p19', motherId: null},
+      { id: 'p21', name: 'Rahu (a.s)', gender: 'M', fatherId: 'p20', motherId: null},
+      { id: 'p22', name: 'Siraj (a.s)', gender: 'M', fatherId: 'p21', motherId: null},
+      { id: 'p23', name: 'Nakhoor (a.s)', gender: 'M', fatherId: 'p22', motherId: null},
+      { id: 'p24', name: 'Tarikh (a.s)', gender: 'M', fatherId: 'p23', motherId: null},
+
+      { id: 'p25', name: 'Hazrat Ibrahim (a.s)', gender: 'M', fatherId: 'p24', motherId: null,},
+      { id: 'p26', name: 'Hajra (s.a)', gender: 'F', fatherId: null, motherId: null, spouses: ['p25'] },
+      { id: 'p27', name: 'Sarah (s.a)', gender: 'F', fatherId: null, motherId: null, spouses: ['p25'] },
+
+        { id: 'p28', name: 'Hazrat Ismail (a.s)', gender: 'M', fatherId: 'p25', motherId: 'p26'},
+        { id: 'p29', name: 'Hazrat Ishaq (a.s)', gender: 'M', fatherId: 'p25', motherId: 'p27'},
+
+          { id: 'p30', name: 'Hazrat Yaqoob (a.s)', gender: 'M', fatherId: 'p29', motherId: null},
+          { id: 'p31', name: 'Hazrat Yousaf (a.s)', gender: 'M', fatherId: 'p30', motherId: null},
+
+        { id: 'p32', name: 'Hazrat Qedar (a.s)', gender: 'M', fatherId: 'p28', motherId: null},
+        { id: 'p33', name: 'Hazrat Haml (a.s)', gender: 'M', fatherId: 'p32', motherId: null},
+        { id: 'p34', name: 'Hazrat Nabit (a.s)', gender: 'M', fatherId: 'p33', motherId: null},
+        { id: 'p35', name: 'Hazrat Hamsiya (a.s)', gender: 'M', fatherId: 'p34', motherId: null},
+        { id: 'p36', name: 'Hazrat Azid (a.s)', gender: 'M', fatherId: 'p35', motherId: null},
+
+        { id: 'p37', name: 'Hazrat Awud (a.s)', gender: 'M', fatherId: 'p36', motherId: null},
+        { id: 'p38', name: 'Hazrat Adnan (a.s)', gender: 'M', fatherId: 'p37', motherId: null},
+
+        {id: 'p39', name: 'Hazrat Maad (a.s)', gender: 'M', fatherId: 'p38', motherId: null},
+        {id: 'p40', name: 'Hazrat Nizar (a.s)', gender: 'M', fatherId: 'p39', motherId: null},
+        {id: 'p41', name: 'Hazrat Mudaar (a.s)', gender: 'M', fatherId: 'p40', motherId: null},
+        {id: 'p42', name: 'Hazrat Ilyas (a.s)', gender: 'M', fatherId: 'p41', motherId: null},
+        {id: 'p43', name: 'Hazrat Mudrikha (a.s)', gender: 'M', fatherId: 'p42', motherId: null},
+        {id: 'p44', name: 'Hazrat Khuzaima (a.s)', gender: 'M', fatherId: 'p43', motherId: null},
+        {id: 'p45', name: 'Hazrat Kinanh (a.s)', gender: 'M', fatherId: 'p44', motherId: null},
+        {id: 'p46', name: 'Hazrat Nzar (a.s)', gender: 'M', fatherId: 'p45', motherId: null},
+        {id: 'p47', name: 'Hazrat Malik (a.s)', gender: 'M', fatherId: 'p46', motherId: null},
+        {id: 'p48', name: 'Hazrat Fahir (a.s) - Known as Quryash', gender: 'M', fatherId: 'p47', motherId: null},
+        {id: 'p49', name: 'Hazrat Ghalib (a.s)', gender: 'M', fatherId: 'p48', motherId: null},
+        {id: 'p50', name: 'Hazrat Luayy (a.s)', gender: 'M', fatherId: 'p49', motherId: null},
+        {id: 'p51', name: 'Hazrat Kaab (a.s)', gender: 'M', fatherId: 'p50', motherId: null},
+        {id: 'p52', name: 'Hazrat Murrah (a.s)', gender: 'M', fatherId: 'p51', motherId: null},
+        {id: 'p53', name: 'Hazrat Kilab (a.s)', gender: 'M', fatherId: 'p52', motherId: null},
+        {id: 'p54', name: 'Hazrat Qussayy (a.s)', gender: 'M', fatherId: 'p53', motherId: null},
+        {id: 'p55', name: 'Hazrat Abd-Manaf (a.s) Qamar al-Batha', gender: 'M', fatherId: 'p54', motherId: null},
+
+        {id: 'p56', name: 'Nofal', gender: 'M', fatherId: 'p55', motherId: null},
+        {id: 'p57', name: 'Mutlib', gender: 'M', fatherId: 'p55', motherId: null},
+        {id: 'p58', name: 'Amr (a.s) - Known as Hashim', gender: 'M', fatherId: 'p55', motherId: null},
+        {id: 'p59', name: 'Abd-Shams', gender: 'M', fatherId: 'p55', motherId: null},
+            {id: '59', name: 'Umayyah', gender: 'M', fatherId: 'p59', motherId: null},
+
+        {id: 'p60', name: 'Shaiba - Known as Abd-ul-Mutlib (a.s)', gender: 'M', fatherId: 'p58', motherId: null},
+
+          {id: 'p61', name: 'Abdullah (a.s)', gender: 'M', fatherId: 'p60', motherId: null},
+          {id: 'p62', name: 'Abu Talib (a.s)', gender: 'M', fatherId: 'p60', motherId: null},
+
+                {id: 'p78', name: 'Talib (a.s)', gender: 'M', fatherId: 'p62', motherId: null},
+                {id: 'p79', name: 'Aqeel (a.s)', gender: 'M', fatherId: 'p62', motherId: null},
+                {id: 'p80', name: 'Jafar al-Tayar (a.s)', gender: 'M', fatherId: 'p62', motherId: null},
+
+          {id: 'p63', name: 'Hamza (a.s)', gender: 'M', fatherId: 'p60', motherId: null},
+          {id: 'p64', name: 'Abbas (a.s)', gender: 'M', fatherId: 'p60', motherId: null},
+          {id: 'p65', name: 'Abu Lahab', gender: 'M', fatherId: 'p60', motherId: null},
+          {id: 'p66', name: 'Haris', gender: 'M', fatherId: 'p60', motherId: null},
+          {id: 'p67', name: 'Hajal', gender: 'M', fatherId: 'p60', motherId: null},
+          {id: 'p68', name: 'Al-Muqawwim', gender: 'M', fatherId: 'p60', motherId: null},
+          {id: 'p70', name: 'Zarar', gender: 'M', fatherId: 'p60', motherId: null},
+          {id: 'p71', name: 'Zubayir', gender: 'M', fatherId: 'p60', motherId: null},
+
+        {id: 'p72', name: 'Hazrat Muhammadﷺ  (a.s)', gender: 'M', fatherId: 'p61', motherId: null, spouses: ['p73']},
+        {id: 'p73', name: 'Hazrat Khadija (s.a)', gender: 'F', fatherId: null, motherId: null, spouses: ['p72']},
+
+        {id: 'p74', name: 'Imam Ali (a.s)', gender: 'M', fatherId: 'p62', motherId: null, spouses: ['p75']},
+        {id: 'p75', name: 'Hazrat Fatima (s.a)', gender: 'F', fatherId: null, motherId: 'p73', spouses: ['p74']},
+        
+        {id: 'p76', name: 'Imam Hassan al-Mujtaba (a.s)', gender: 'M', fatherId: 'p74', motherId: 'p75'},
+        
+
+        {id: 'p77', name: 'Imam Hassain (a.s)', gender: 'M', fatherId: 'p74', motherId: 'p75'},  
+        {id: 'p81', name: 'Imam Zain-ul-Abideen (a.s)', gender: 'M', fatherId: 'p77', motherId: null},
+        {id: 'p82', name: 'Ali Akbar (a.s)', gender: 'M', fatherId: 'p77', motherId: null},
+        {id: 'p83', name: 'Ali Asghar (a.s)', gender: 'M', fatherId: 'p77', motherId: null},
+        {id: 'p84', name: 'Abdullah (a.s)', gender: 'M', fatherId: 'p77', motherId: null},
+        {id: 'p85', name: 'Jafar (a.s)', gender: 'M', fatherId: 'p77', motherId: null},
+        
+        {id: 'p86', name: 'Imam Muhammad al-Baqir (a.s)', gender: 'M', fatherId: 'p81', motherId: null},
+        {id: 'p87', name: 'Abdullah (a.s)', gender: 'M', fatherId: 'p81', motherId: null},
+        {id: 'p88', name: 'Hassan (a.s)', gender: 'M', fatherId: 'p81', motherId: null},
+        {id: 'p89', name: 'Zayid (a.s)', gender: 'M', fatherId: 'p81', motherId: null},
+        {id: 'p90', name: 'Amr (a.s)', gender: 'M', fatherId: 'p81', motherId: null},
+        {id: 'p91', name: 'Hussain (a.s)', gender: 'M', fatherId: 'p81', motherId: null},
+        {id: 'p92', name: 'Abdul Rehman (a.s)', gender: 'M', fatherId: 'p81', motherId: null},
+        {id: 'p93', name: 'Suleiman (a.s)', gender: 'M', fatherId: 'p81', motherId: null},
+        {id: 'p94', name: 'Ali (a.s)', gender: 'M', fatherId: 'p81', motherId: null},
+        {id: 'p95', name: 'Muhammad Asghar (a.s)', gender: 'M', fatherId: 'p81', motherId: null},
+        {id: 'p96', name: 'Hussain Asghar (a.s)', gender: 'M', fatherId: 'p81', motherId: null},
+        
+        {id: 'p97', name: 'Abdullah (a.s)', gender: 'M', fatherId: 'p86', motherId: null},
+        {id: 'p98', name: 'Ibrahim (a.s)', gender: 'M', fatherId: 'p86', motherId: null},
+        {id: 'p99', name: 'Ali (a.s)', gender: 'M', fatherId: 'p86', motherId: null},
+        {id: 'p100', name: 'Imam Jafar al-Sadiq (a.s)', gender: 'M', fatherId: 'p86', motherId: null},
+        {id: 'p101', name: 'Abdullah Aftah (a.s)', gender: 'M', fatherId: 'p86', motherId: null},
+
+        {id: 'p102', name: 'Ismail (a.s)', gender: 'M', fatherId: 'p100', motherId: null},
+        {id: 'p103', name: 'Imam Musa al-Kazim (a.s)', gender: 'M', fatherId: 'p100', motherId: null},
+        {id: 'p104', name: 'Abdullah (a.s)', gender: 'M', fatherId: 'p100', motherId: null},
+        {id: 'p105', name: 'Ishaq (a.s)', gender: 'M', fatherId: 'p100', motherId: null},
+        {id: 'p106', name: 'Muhammad (a.s)', gender: 'M', fatherId: 'p100', motherId: null},
+        {id: 'p107', name: 'Ali (a.s)', gender: 'M', fatherId: 'p100', motherId: null},
+        {id: 'p108', name: 'Abbas (a.s)', gender: 'M', fatherId: 'p100', motherId: null},
+
+        {id: 'p109', name: 'Syed Jafar Asghar (a.s)', gender: 'M', fatherId: 'p107', motherId: null},
+        {id: 'p110', name: 'Syed Ahmad (a.s)', gender: 'M', fatherId: 'p107', motherId: null},
+        {id: 'p111', name: 'Syed Muhammad Baghdadi (a.s)', gender: 'M', fatherId: 'p107', motherId: null},
+        {id: 'p112', name: 'Syed Ismail (a.s)', gender: 'M', fatherId: 'p107', motherId: null},
+        {id: 'p113', name: 'Syed Muhammad Hassan (a.s)', gender: 'M', fatherId: 'p107', motherId: null},
+
+        {id: 'p114', name: 'Syed Hassan Baghdadi (a.s)', gender: 'M', fatherId: 'p111', motherId: null},
+        {id: 'p115', name: 'Syed Abdullah Misari (a.s)', gender: 'M', fatherId: 'p114', motherId: null},
+        {id: 'p116', name: 'Syed Muhammad Khwarizmi (a.s)', gender: 'M', fatherId: 'p115', motherId: null},
+        {id: 'p117', name: 'Syed Ali (Mastana-e-Khuda) (a.s)', gender: 'M', fatherId: 'p116', motherId: null},
+        {id: 'p118', name: 'Syed Muhammad Khwarizmi (a.s)', gender: 'M', fatherId: 'p117', motherId: null},
+        {id: 'p119', name: 'Syed Abdullah Khwarizmi (a.s)', gender: 'M', fatherId: 'p118', motherId: null},
+        {id: 'p120', name: 'Syed Ahmad Multani', gender: 'M', fatherId: 'p119', motherId: null},
+        {id: 'p121', name: 'Syed Muhammad Sadr Ajal Multani', gender: 'M', fatherId: 'p120', motherId: null},
+        {id: 'p122', name: 'Syed Hameed-u-Din Multani', gender: 'M', fatherId: 'p121', motherId: null},
+        {id: 'p123', name: 'Syed Jalal-u-Din Multani', gender: 'M', fatherId: 'p122', motherId: null},
+        {id: 'p124', name: 'Syed Bahauldin Multani', gender: 'M', fatherId: 'p123', motherId: null},
+        {id: 'p125', name: 'Syed Jalal-u-Din Talambi', gender: 'M', fatherId: 'p124', motherId: null},
+
+        {id: 'p126', name: 'Syed Faiz Ullah', gender: 'M', fatherId: 'p125', motherId: null},
+        {id: 'p127', name: 'Syed Yaseen Talambi', gender: 'M', fatherId: 'p125', motherId: null},
+        {id: 'p128', name: 'Syed Sharif-u-Din', gender: 'M', fatherId: 'p125', motherId: null},
+
+        {id: 'p129', name: 'Syed Moyin-u-Din Talambi', gender: 'M', fatherId: 'p127', motherId: null},
+        {id: 'p130', name: 'Syed Anwar Talambi', gender: 'M', fatherId: 'p127', motherId: null},
+
+        {id: 'p131', name: 'Syed Nizam-u-Din Talambi', gender: 'M', fatherId: 'p129', motherId: null},
+        {id: 'p132', name: 'Syed Allah Dad', gender: 'M', fatherId: 'p129', motherId: null},
+        {id: 'p133', name: 'Syed Fakhar-u-Din', gender: 'M', fatherId: 'p129', motherId: null},
+
+        {id: 'p134', name: 'Syed Ahmad Ghafar', gender: 'M', fatherId: 'p131', motherId: null},
+        {id: 'p135', name: 'Syed Abdul Rehman', gender: 'M', fatherId: 'p131', motherId: null},
+        {id: 'p136', name: 'Syed Ahmad Akbar', gender: 'M', fatherId: 'p131', motherId: null},
+        {id: 'p137', name: 'Syed Suleiman', gender: 'M', fatherId: 'p131', motherId: null},
+        {id: 'p138', name: 'Syed Yasin', gender: 'M', fatherId: 'p131', motherId: null},
+
+        {id: 'p139', name: 'Syed Meeran', gender: 'M', fatherId: 'p137', motherId: null},
+        {id: 'p140', name: 'Syed Moyin-u-Din', gender: 'M', fatherId: 'p137', motherId: null},
+        {id: 'p141', name: 'Syed Mittha', gender: 'M', fatherId: 'p137', motherId: null},
+        {id: 'p142', name: 'Syed Rukn-u-Din', gender: 'M', fatherId: 'p137', motherId: null},
+        {id: 'p143', name: 'Syed Mahmood', gender: 'M', fatherId: 'p137', motherId: null},
+        {id: 'p144', name: 'Syed Muhammad', gender: 'M', fatherId: 'p137', motherId: null},
+
+        {id: 'p145', name: 'Syed Hamid', gender: 'M', fatherId: 'p142', motherId: null},
+        {id: 'p146', name: 'Syed Ismail', gender: 'M', fatherId: 'p142', motherId: null},
+        {id: 'p147', name: 'Syed Muhammad Darwesh', gender: 'M', fatherId: 'p142', motherId: null},
+
+        {id: 'p148', name: 'Syed Abdul Malik', gender: 'M', fatherId: 'p146', motherId: null},
+        {id: 'p149', name: 'Syed Muhammad - Known as Shah Sharif', gender: 'M', fatherId: 'p148', motherId: null},
+
+        {id: 'p150', name: 'Syed Abdullah', gender: 'M', fatherId: 'p149', motherId: null},
+
+        {id: 'p151', name: 'Syed Waliullah', gender: 'M', fatherId: 'p150', motherId: null},
+        {id: 'p152', name: 'Syed Kaleemullah', gender: 'M', fatherId: 'p150', motherId: null},
+        {id: 'p153', name: 'Syed Abd-ul-Rasool', gender: 'M', fatherId: 'p150', motherId: null},
+        
+        {id: 'p154', name: 'Syed Jewan Shah', gender: 'M', fatherId: 'p152', motherId: null},
+        {id: 'p155', name: 'Syed Ali Shah', gender: 'M', fatherId: 'p152', motherId: null},
+        {id: 'p156', name: 'Syed Ahmad Shah', gender: 'M', fatherId: 'p152', motherId: null},
+        {id: 'p157', name: 'Syed Akabir Shah', gender: 'M', fatherId: 'p152', motherId: null},
+
+        {id: 'p158', name: 'Syed Hassan Shah', gender: 'M', fatherId: 'p157', motherId: null},
+        {id: 'p159', name: 'Syed Umar Shah', gender: 'M', fatherId: 'p157', motherId: null},
+
+        {id: 'p160', name: 'Syed Qasim Shah', gender: 'M', fatherId: 'p158', motherId: null},
+        {id: 'p161', name: 'Syed Haider Shah', gender: 'M', fatherId: 'p158', motherId: null},
+        {id: 'p162', name: 'Syed Burhan Shah', gender: 'M', fatherId: 'p158', motherId: null},
+
+        {id: 'p163', name: 'Syed Amir Shah', gender: 'M', fatherId: 'p162', motherId: null},
+        {id: 'p164', name: 'Syed Rasool Shah', gender: 'M', fatherId: 'p162', motherId: null},
+        {id: 'p165', name: 'Syed Aalam Shah', gender: 'M', fatherId: 'p162', motherId: null},
+
+        {id: 'p166', name: 'Syed Jumlay Shah', gender: 'M', fatherId: 'p165', motherId: null},
+        {id: 'p167', name: 'Syed Ahmad Shah', gender: 'M', fatherId: 'p165', motherId: null},
+        {id: 'p168', name: 'Syed Nabi Shah', gender: 'M', fatherId: 'p165', motherId: null},
+        {id: 'p169', name: 'Syed Muhammad Fazil Shah', gender: 'M', fatherId: 'p165', motherId: null},
+
+        {id: 'p170', name: 'Syed Sardar Ali', gender: 'M', fatherId: 'p169', motherId: null},
+        {id: 'p171', name: 'Syed Asghar Ali', gender: 'M', fatherId: 'p169', motherId: null},
+        
+        {id: 'p172', name: 'Syed Yousaf Ali', gender: 'M', fatherId: 'p169', motherId: null},
+            {id: 'p176', name: 'Syed Sajjad Hussain', gender: 'M', fatherId: 'p172', motherId: null},
+            {id: 'p177', name: 'Syed Kazim Hussain', gender: 'M', fatherId: 'p172', motherId: null},
+            {id: 'p178', name: 'Syed Sibt Hussain', gender: 'M', fatherId: 'p172', motherId: null},
+            {id: 'p179', name: 'Syed Nasir Hussain', gender: 'M', fatherId: 'p172', motherId: null},
+            {id: 'p180', name: 'Syed Abbas Hussain', gender: 'M', fatherId: 'p172', motherId: null},
+
+        {id: 'p173', name: 'Syed Haider Ali', gender: 'M', fatherId: 'p169', motherId: null},
+            {id: 'p175', name: 'Syed Nisar Haider', gender: 'M', fatherId: 'p173', motherId: null},
+        
+        {id: 'p174', name: 'Syed Tufail Hussain', gender: 'M', fatherId: 'p169', motherId: null},
+
+        {id: 'p181', name: 'Syed Amanat Hassan', gender: 'M', fatherId: 'p170', motherId: null},
+            {id: 'p185', name: 'Syed Najam-ul-Hassan', gender: 'M', fatherId: 'p181', motherId: null},
+                {id: 'p191', name: 'Syed Turab Hassan', gender: 'M', fatherId: 'p185', motherId: null},
+            {id: 'p186', name: 'Syed Shahid Hussain', gender: 'M', fatherId: 'p181', motherId: null},
+                {id: 'p192', name: 'Syed Muhammad Haider', gender: 'M', fatherId: 'p186', motherId: null},
+                {id: 'p193', name: 'Syed Ali Haider', gender: 'M', fatherId: 'p186', motherId: null},
+                {id: 'p194', name: 'Syed Muhammad Asad Hussain', gender: 'M', fatherId: 'p186', motherId: null},
+
+        {id: 'p182', name: 'Syed Ali Hussain', gender: 'M', fatherId: 'p170', motherId: null},
+            {id: 'p187', name: 'Syed Anees Hussain', gender: 'M', fatherId: 'p182', motherId: null},
+            {id: 'p195', name: 'Syed Muhammad Haider', gender: 'M', fatherId: 'p187', motherId: null},
+                {id: 'p200', name: 'Syed Musa Raza', gender: 'M', fatherId: 'p195', motherId: null},
+            {id: 'p196', name: 'Syed Muhammad Baqir', gender: 'M', fatherId: 'p187', motherId: null},
+                {id: 'p201', name: 'Syed Rehan Mehdi', gender: 'M', fatherId: 'p196', motherId: null},
+            {id: 'p197', name: 'Syed Sardar Ali', gender: 'M', fatherId: 'p187', motherId: null},
+            {id: 'p198', name: 'Syed Jermiah', gender: 'M', fatherId: 'p187', motherId: null},
+            {id: 'p199', name: 'Syed Issac', gender: 'M', fatherId: 'p187', motherId: null},
+
+        {id: 'p183', name: 'Syed Qalb-e-Abbas', gender: 'M', fatherId: 'p170', motherId: null},
+            {id: 'p188', name: 'Syed Qaswar Abbas', gender: 'M', fatherId: 'p183', motherId: null},
+            {id: 'p189', name: 'Syed Aoun Abbas', gender: 'M', fatherId: 'p183', motherId: null},
+
+        {id: 'p184', name: 'Syed Abid Hussain', gender: 'M', fatherId: 'p170', motherId: null},
+            {id: 'p190', name: 'Syed Intzar Mehdi', gender: 'M', fatherId: 'p184', motherId: null},
+              {id: 'p202', name: 'Syed Muhammad Moazzam Mehdi', gender: 'M', fatherId: 'p190', motherId: null},
+              {id: 'p203', name: 'Syed Mehdi Azadar Hussain', gender: 'M', fatherId: 'p190', motherId: null},
+  ];
+
+  // --------------------------
+  // 🧠 HELPER FUNCTIONS
+  // --------------------------
+  const byId = new Map(PEOPLE.map(p => [p.id, p]));
+
+  function childrenOf(personId) {
+    return PEOPLE.filter(p => p.fatherId === personId || p.motherId === personId);
+  }
+
+  function spouseNames(person) {
+    if (!person.spouses || !person.spouses.length) return '';
+    return person.spouses.map(id => byId.get(id)?.name || 'Unknown').join(', ');
+  }
+
+  function founderIds() {
+    // People with no known parents are considered founders
+    return PEOPLE.filter(p => !p.fatherId && !p.motherId).map(p => p.id);
+  }
+
+  function buildTreeHTML(personId, depth = 0, collapseDepth = 2) {
+  const person = byId.get(personId);
+  if (!person) return '';
+
+  const kids = childrenOf(personId);
+  const hasChildren = kids.length > 0;
+  const liClass = (hasChildren && depth >= collapseDepth) ? 'collapsed' : '';
+
+  const dates = [person.dob, person.dod].filter(Boolean).join(' – ');
+  const spouseText = spouseNames(person);
+
+  let html = `<li class="${liClass}" data-id="${person.id}">`;
+  if (hasChildren) html += `<div class="toggle" title="Collapse/Expand">${depth >= collapseDepth ? '+' : '–'}</div>`;
+
+  html += `
+    <div class="card" data-id="${person.id}" title="Click to collapse/expand children">
+      <div class="name">${person.name}</div>
+      <div class="tags">
+        ${person.gender ? `<span class="tag">${person.gender === 'M' ? 'Male' : 'Female'}</span>` : ''}
+        ${person.fatherId ? `<span class="tag">Father: ${byId.get(person.fatherId)?.name || 'Unknown'}</span>` : ''}
+        ${person.motherId ? `<span class="tag">Mother: ${byId.get(person.motherId)?.name || 'Unknown'}</span>` : ''}
+      </div>
+      ${dates ? `<div class="meta">${dates}</div>` : ''}
+      ${spouseText ? `<div class="spouses">Spouse(s): <strong>${spouseText}</strong></div>` : ''}
+    </div>`;
+
+  // ✅ FIX: Render siblings side-by-side
+  if (hasChildren) {
+    html += '<ul>';
+    kids.forEach(child => {
+      // Render just the node wrapper first
+      html += `<li data-id="${child.id}">${buildTreeHTML(child.id, depth + 1, collapseDepth)}</li>`;
+    });
+    html += '</ul>';
+  }
+
+  html += '</li>';
+  return html;
+}
+
+  function render(rootId, collapseDepth = 2) {
+    const root = byId.get(rootId) || PEOPLE[0];
+    const html = `<ul><li data-id="${root.id}">${buildTreeHTML(root.id, 0, collapseDepth)}</li></ul>`;
+    document.getElementById('treeContainer').innerHTML = html;
+
+    // Wire toggles
+    document.querySelectorAll('.card').forEach(card => {
+      card.addEventListener('click', (e) => {
+        const li = e.currentTarget.closest('li');
+        if (!li) return;
+        const collapsed = li.classList.toggle('collapsed');
+        const tog = li.querySelector('.toggle');
+        if (tog) tog.textContent = collapsed ? '+' : '–';
+      });
+    });
+  }
+
+  function populateRootPicker() {
+    const sel = document.getElementById('rootPicker');
+    sel.innerHTML = '';
+    const founders = founderIds();
+    for (const id of founders) {
+      const opt = document.createElement('option');
+      opt.value = id; opt.textContent = byId.get(id).name;
+      sel.appendChild(opt);
+    }
+    // Select the first founder by default
+    if (founders.length) sel.value = founders[0];
+  }
+
+  function expandPathTo(targetLi) {
+    if (!targetLi) return;
+    let node = targetLi;
+    while (node && node.matches('li')) {
+      node.classList.remove('collapsed');
+      const tog = node.querySelector(':scope > .toggle');
+      if (tog) tog.textContent = '–';
+      node = node.parentElement?.closest('li');
+    }
+  }
+
+  function collapseAll() {
+    document.querySelectorAll('#treeContainer li').forEach(li => {
+      if (li.querySelector(':scope > ul')) { li.classList.add('collapsed'); }
+      const tog = li.querySelector(':scope > .toggle');
+      if (tog) tog.textContent = '+';
+    });
+  }
+
+  function expandAll() {
+    document.querySelectorAll('#treeContainer li').forEach(li => {
+      li.classList.remove('collapsed');
+      const tog = li.querySelector(':scope > .toggle');
+      if (tog) tog.textContent = '–';
+    });
+  }
+
+  function exportJSON() {
+    const data = JSON.stringify(PEOPLE, null, 2);
+    const blob = new Blob([data], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url; a.download = 'syed_family.json'; a.click();
+    URL.revokeObjectURL(url);
+  }
+
+  function importJSON(file) {
+    const reader = new FileReader();
+    reader.onload = () => {
+      try {
+        const arr = JSON.parse(reader.result);
+        if (!Array.isArray(arr)) throw new Error('Invalid JSON: expected an array of people');
+        // Basic validation: each needs id + name
+        for (const p of arr) {
+          if (!p.id || !p.name) throw new Error('Each person must have id and name');
+        }
+        PEOPLE.length = 0; // clear
+        arr.forEach(p => PEOPLE.push(p));
+        byId.clear();
+        PEOPLE.forEach(p => byId.set(p.id, p));
+        populateRootPicker();
+        render(document.getElementById('rootPicker').value);
+        alert('Imported successfully.');
+      } catch (e) {
+        alert('Import failed: ' + e.message);
+      }
+    };
+    reader.readAsText(file);
+  }
+
+  // --------------------------
+  // 🚦 INIT
+  // --------------------------
+  populateRootPicker();
+  render(document.getElementById('rootPicker').value);
+
+  // UI events
+  document.getElementById('rootPicker').addEventListener('change', (e) => {
+    render(e.target.value);
+  });
+  document.getElementById('collapseAll').addEventListener('click', collapseAll);
+  document.getElementById('expandAll').addEventListener('click', expandAll);
+  document.getElementById('exportJson').addEventListener('click', exportJSON);
+  document.getElementById('importFile').addEventListener('change', (e) => {
+    const file = e.target.files?.[0];
+    if (file) importJSON(file);
+    e.target.value = '';
+  });
+  document.getElementById('btnSearch').addEventListener('click', () => {
+    const q = document.getElementById('search').value.trim().toLowerCase();
+    if (!q) return;
+    const match = PEOPLE.find(p => p.name.toLowerCase().includes(q));
+    if (!match) { alert('No match found'); return; }
+    // ensure the DOM is rendered for the current root
+    const node = document.querySelector(`#treeContainer li[data-id="${match.id}"]`) || document.querySelector(`#treeContainer .card[data-id="${match.id}"]`)?.closest('li');
+    if (node) {
+      expandPathTo(node);
+      node.scrollIntoView({ behavior: 'smooth', block: 'center', inline: 'center' });
+      node.querySelector('.card').style.outline = '2px solid var(--accent-2)';
+      setTimeout(() => node.querySelector('.card').style.outline = 'none', 1500);
+    } else {
+      alert('Person exists but is not under this root. Pick a different root from the dropdown.');
+    }
+  });
+
+  // Allow pressing Enter in search box
+  document.getElementById('search').addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') document.getElementById('btnSearch').click();
+  });
+  </script>
+</body>
+</html>
