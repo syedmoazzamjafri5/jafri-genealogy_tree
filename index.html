@@ -549,7 +549,7 @@
   // Check if device is mobile
   if (/Mobi|Android/i.test(navigator.userAgent)) {
     if (!globalRefPopupShown) {
-      alert("📱 For best experience, please view references on a computer.");
+      alert("📱 For best experience, please view on a computer.");
       globalRefPopupShown = true;
     }
   }
@@ -568,10 +568,6 @@ function toggleGlobalReferences() {
     btn.textContent = "Hide References";
   }
 }
-
-
-
-
 
 
   function exportJSON() {
